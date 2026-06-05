@@ -23,3 +23,18 @@ Open <http://127.0.0.1:8000/>.
 - Set `REDIS_URL` for Celery and cache.
 - Set VAPID keys before enabling Web Push.
 - Serve over HTTPS for PWA installability and Web Push.
+
+## Render
+
+This repository includes `render.yaml`, so Render can create the web service and PostgreSQL database from the repo.
+
+1. Push the latest `main` branch to GitHub.
+2. In Render, choose **New +** -> **Blueprint** and connect `hqleop/uk-highway-code-pwa`.
+3. Confirm the generated web service and database.
+4. After the first deploy, open the Render shell and run:
+
+```bash
+python manage.py import_highway_code
+```
+
+The deploy runs `migrate` and `seed_quiz` automatically. The full official gov.uk content import is kept manual so regular deploys do not depend on the gov.uk scraper.
