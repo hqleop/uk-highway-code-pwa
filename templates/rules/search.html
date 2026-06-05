@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Search | UK Highway Code{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Find rules</p>
+    <h1>Search</h1>
+  </div>
+  <form class="search-form" action="{% url 'rules:search' %}">
+    <input name="q" type="search" value="{{ query }}" placeholder="Search rules" aria-label="Search rules">
+    <button class="icon-button" type="submit" title="Search"><i data-lucide="search"></i></button>
+  </form>
+</section>
+<div class="rule-list">
+  {% for rule in results %}
+    <a class="rule-card" href="{% url 'rules:rule_detail' rule.section.slug rule.rule_number|default:rule.id %}">
+      <span class="rule-number">{{ rule.rule_number|default:"Info" }}</span>
+      <div>
+        <strong>{{ rule.title|default:rule.section.title }}</strong>
+        <p>{{ rule.content|striptags|truncatewords:30 }}</p>
+      </div>
+    </a>
+  {% empty %}
+    <div class="empty-state"><p>Search for a rule number, phrase, or section name.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Offline | UK Highway Code{% endblock %}
+{% block content %}
+<section class="empty-state">
+  <h1>You are offline</h1>
+  <p>Previously visited study pages may still be available. Reconnect to sync quizzes, notes, and new content.</p>
+  <a class="button primary" href="{% url 'core:home' %}" data-icon="home">Try home</a>
+</section>
+{% endblock %}

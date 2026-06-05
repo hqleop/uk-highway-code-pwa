@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ section.title }} | UK Highway Code{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Rules section</p>
+    <h1>{{ section.title }}</h1>
+    <a class="source-link" href="{{ section.source_url }}" target="_blank" rel="noopener">Source: gov.uk</a>
+  </div>
+</section>
+
+{% if progress %}
+  <div class="progress-line" aria-label="Section progress">
+    <span style="width: {% widthratio progress.rules_read.count rules.count 100 %}%"></span>
+  </div>
+{% endif %}
+
+<div class="rule-list">
+  {% for rule in rules %}
+    <a class="rule-card" href="{% url 'rules:rule_detail' section.slug rule.rule_number|default:rule.id %}">
+      <span class="rule-number">{% if rule.rule_number %}{{ rule.rule_number }}{% else %}Info{% endif %}</span>
+      <div>
+        <strong>{{ rule.title|default:section.title }}</strong>
+        <p>{{ rule.content|striptags|truncatewords:26 }}</p>
+      </div>
+      {% if rule.id in read_ids %}<i data-lucide="check-circle-2"></i>{% endif %}
+    </a>
+  {% empty %}
+    <div class="empty-state"><p>No rules have been imported for this section yet.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

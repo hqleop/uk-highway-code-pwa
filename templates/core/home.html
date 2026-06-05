@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Study the UK Highway Code{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-copy">
+    <p class="eyebrow">Official source links from gov.uk</p>
+    <h1>UK Highway Code</h1>
+    <p>Study the rules, practise quick quizzes, keep a daily streak, and save your own notes as you learn.</p>
+    <div class="hero-actions">
+      <a class="button primary" href="{% url 'rules:section_list' %}" data-icon="book-open">Start studying</a>
+      <a class="button ghost" href="{% url 'quiz:home' %}" data-icon="circle-help">Take a quiz</a>
+    </div>
+  </div>
+  <div class="sign-board" aria-label="Study stats">
+    <span class="road-label">LEARN</span>
+    <strong>{{ rule_count }}</strong>
+    <span>rules imported</span>
+    <strong>{{ question_count }}</strong>
+    <span>active questions</span>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-heading">
+    <h2>Continue by section</h2>
+    <a href="{% url 'rules:section_list' %}">View all</a>
+  </div>
+  <div class="card-grid">
+    {% for section in sections %}
+      <a class="section-card" href="{% url 'rules:section_detail' section.slug %}">
+        <i data-lucide="{{ section.icon|default:'book-open' }}"></i>
+        <strong>{{ section.title }}</strong>
+        <span>{{ section.rules.count }} rules</span>
+      </a>
+    {% empty %}
+      <div class="empty-state">
+        <h2>No rules imported yet</h2>
+        <p>Run <code>python manage.py import_highway_code --limit-sections 4</code> to load official gov.uk content.</p>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="daily-panel">
+  <div>
+    <p class="eyebrow">Daily Challenge</p>
+    <h2>One question, every day</h2>
+    <p>Build a streak with a small daily practice session.</p>
+  </div>
+  <a class="button primary" href="{% url 'daily:today' %}" data-icon="calendar-days">Open daily</a>
+</section>
+{% endblock %}

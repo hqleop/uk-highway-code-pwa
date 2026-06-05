@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="UK Highway Code icon">
+  <rect width="512" height="512" rx="96" fill="#1a3a5c"/>
+  <path d="M96 152h320v208H96z" fill="#f5c518"/>
+  <path d="M128 184h256v144H128z" fill="#fff"/>
+  <path d="M168 236h176M168 284h128" stroke="#1a3a5c" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="384" cy="360" r="38" fill="#c0392b"/>
+</svg>

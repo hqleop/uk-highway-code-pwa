@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Quiz Session | UK Highway Code{% endblock %}
+{% block content %}
+<section class="page-header compact">
+  <div>
+    <p class="eyebrow">Quiz session</p>
+    <h1>{{ quiz.correct_answers }} / {{ quiz.total_questions }}</h1>
+  </div>
+</section>
+
+{% if question %}
+  <section class="question-card" data-quiz-session="{{ quiz.id }}">
+    <p class="eyebrow">{{ question.category|title }} · {{ question.difficulty|title }}</p>
+    <h2 data-question-text>{{ question.question_text }}</h2>
+    <form data-answer-form>
+      {% csrf_token %}
+      <input type="hidden" name="session_id" value="{{ quiz.id }}">
+      <input type="hidden" name="question_id" value="{{ question.id }}" data-question-id>
+      <div class="answers" data-answers>
+        {% for answer in question.answers.all %}
+          <label class="answer-option">
+            <input type="radio" name="answer_id" value="{{ answer.id }}" required>
+            <span>{{ answer.text }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      <button class="button primary" type="submit" data-icon="check">Submit answer</button>
+    </form>
+    <div class="feedback" data-feedback hidden></div>
+  </section>
+{% else %}
+  <section class="empty-state">
+    <h1>Quiz complete</h1>
+    <a class="button primary" href="{% url 'quiz:results' quiz.id %}" data-icon="bar-chart-3">View results</a>
+  </section>
+{% endif %}
+{% endblock %}

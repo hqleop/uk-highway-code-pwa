@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Rule {{ rule.rule_number }} | UK Highway Code{% endblock %}
+{% block content %}
+<article class="rule-detail">
+  <div class="rule-detail-head">
+    <span class="rule-number">{{ rule.rule_number|default:"Info" }}</span>
+    <div>
+      <p class="eyebrow">{{ rule.section.title }}</p>
+      <h1>{{ rule.title|default:"Highway Code rule" }}</h1>
+      <a class="source-link" href="{{ rule.source_url }}" target="_blank" rel="noopener">Source: gov.uk</a>
+    </div>
+  </div>
+  <div class="gov-content">{{ rule.content|safe }}</div>
+</article>
+
+<section class="notes-panel">
+  <div class="section-heading">
+    <h2>Your notes</h2>
+    {% if not request.user.is_authenticated %}
+      <a href="{% url 'accounts:register' %}">Create account</a>
+    {% endif %}
+  </div>
+  {% if request.user.is_authenticated %}
+    <form class="note-form" data-note-form>
+      {% csrf_token %}
+      <input type="hidden" name="rule_id" value="{{ rule.id }}">
+      <textarea name="content" rows="3" placeholder="Add a private note for this rule"></textarea>
+      <button class="button primary" type="submit" data-icon="save">Add note</button>
+    </form>
+    <div class="note-list" data-note-list>
+      {% for note in notes %}
+        <p>{{ note.content }}</p>
+      {% empty %}
+        <p class="muted">No notes yet.</p>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">Log in to save notes and track progress.</p>
+  {% endif %}
+</section>
+{% endblock %}

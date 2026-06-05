@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Daily Challenge | UK Highway Code{% endblock %}
+{% block content %}
+<section class="daily-panel tall">
+  <div>
+    <p class="eyebrow">Daily Challenge</p>
+    <h1>Today’s question</h1>
+    {% if request.user.is_authenticated %}
+      <p>Current streak: {{ request.user.userprofile.streak_days }} days</p>
+    {% else %}
+      <p>Log in to save a streak across devices.</p>
+    {% endif %}
+  </div>
+</section>
+
+{% if challenge %}
+  <section class="question-card">
+    <h2>{{ challenge.question.question_text }}</h2>
+    {% if existing %}
+      <div class="feedback success">
+        You already answered today. {% if existing.is_correct %}Correct.{% else %}Review the explanation and try again tomorrow.{% endif %}
+      </div>
+      <p>{{ challenge.question.explanation }}</p>
+    {% else %}
+      <form data-daily-form>
+        {% csrf_token %}
+        <div class="answers">
+          {% for answer in challenge.question.answers.all %}
+            <label class="answer-option">
+              <input type="radio" name="answer_id" value="{{ answer.id }}" required>
+              <span>{{ answer.text }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        <button class="button primary" type="submit" data-icon="check">Submit daily answer</button>
+      </form>
+      <div class="feedback" data-feedback hidden></div>
+    {% endif %}
+  </section>
+{% else %}
+  <section class="empty-state">
+    <p>No active questions are available yet. Seed or add questions in Django Admin.</p>
+  </section>
+{% endif %}
+{% endblock %}

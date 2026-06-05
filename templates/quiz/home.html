@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Quiz | UK Highway Code{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Practice mode</p>
+    <h1>Quiz</h1>
+  </div>
+</section>
+
+<form class="quiz-setup" data-quiz-start>
+  {% csrf_token %}
+  <label>
+    Category
+    <select name="category">
+      <option value="">All categories</option>
+      {% for category in categories %}
+        <option value="{{ category.category }}">{{ category.category|title }} ({{ category.total }})</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    Questions
+    <select name="total_questions">
+      <option value="10">10 questions</option>
+      <option value="20">20 questions</option>
+      <option value="50">Full practice</option>
+    </select>
+  </label>
+  <button class="button primary" type="submit" data-icon="play">Start quiz</button>
+  <p class="form-status" data-form-status></p>
+</form>
+{% endblock %}

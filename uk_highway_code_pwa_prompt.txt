@@ -1,0 +1,596 @@
+Промт: UK Highway Code — PWA застосунок на Django
+Загальна концепція
+Розробити повноцінний PWA (Progressive Web App) + вебсайт для вивчення та тестування Правил дорожнього руху Великої Британії. Контент береться виключно з офіційних джерел `gov.uk` (The Highway Code: https://www.gov.uk/guidance/the-highway-code).
+Стек: Python 3.12+, Django 5.x, PostgreSQL, Redis (для Celery), Celery + celery-beat (нагадування), django-push-notifications або web-push-py (Web Push API), Tailwind CSS (через django-tailwind або CDN), Vanilla JS для PWA-логіки.
+---
+Архітектура проєкту
+```
+highway_code/
+├── config/               # settings, urls, wsgi, asgi
+├── apps/
+│   ├── core/             # головна сторінка, статичні сторінки
+│   ├── rules/            # розділи ПДР, статті, пошук
+│   ├── quiz/             # тести, питання, результати
+│   ├── daily/            # щоденні питання (Daily Challenge)
+│   ├── accounts/         # реєстрація, профіль, прогрес, нотатки
+│   ├── notifications/    # Web Push підписки та Celery-задачі
+│   └── donations/        # сторінка з посиланням на благодійний донат
+├── static/
+│   ├── manifest.json
+│   ├── sw.js             # Service Worker
+│   └── ...
+├── templates/
+└── locale/               # i18n рядки інтерфейсу (не контент)
+```
+---
+Моделі даних
+apps/rules/models.py
+```python
+class RuleSection(models.Model):
+    """Розділ ПДР (наприклад: 'Rules for pedestrians', 'Using the road')"""
+    title = models.CharField(max_length=255)
+    slug = models.SlugField(unique=True)
+    order = models.PositiveIntegerField(default=0)
+    icon = models.CharField(max_length=50, blank=True)  # emoji або назва іконки
+    source_url = models.URLField()  # посилання на gov.uk
+
+    class Meta:
+        ordering = ['order']
+
+class Rule(models.Model):
+    """Окреме правило / стаття ПДР"""
+    section = models.ForeignKey(RuleSection, on_delete=models.CASCADE, related_name='rules')
+    rule_number = models.CharField(max_length=10, blank=True)  # наприклад '1', '170'
+    title = models.CharField(max_length=255, blank=True)
+    content = models.TextField()  # HTML або Markdown
+    has_image = models.BooleanField(default=False)
+    image = models.ImageField(upload_to='rules/', blank=True, null=True)
+    source_url = models.URLField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['section__order', 'rule_number']
+```
+apps/quiz/models.py
+```python
+class Question(models.Model):
+    CATEGORY_CHOICES = [
+        ('theory', 'Theory'),
+        ('hazard', 'Hazard Perception'),
+        ('signs', 'Road Signs'),
+        ('rules', 'Highway Code'),
+    ]
+    DIFFICULTY_CHOICES = [('easy','Easy'), ('medium','Medium'), ('hard','Hard')]
+
+    rule = models.ForeignKey('rules.Rule', on_delete=models.SET_NULL, null=True, blank=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    difficulty = models.CharField(max_length=10, choices=DIFFICULTY_CHOICES, default='medium')
+    question_text = models.TextField()
+    image = models.ImageField(upload_to='questions/', blank=True, null=True)
+    explanation = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class Answer(models.Model):
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answers')
+    text = models.CharField(max_length=500)
+    is_correct = models.BooleanField(default=False)
+
+class QuizSession(models.Model):
+    """Сесія тестування — для анонімних та зареєстрованих"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             null=True, blank=True)
+    session_key = models.CharField(max_length=40, blank=True)  # для анонімних
+    category = models.CharField(max_length=20, blank=True)
+    total_questions = models.PositiveIntegerField()
+    correct_answers = models.PositiveIntegerField(default=0)
+    completed = models.BooleanField(default=False)
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+class QuizAnswer(models.Model):
+    session = models.ForeignKey(QuizSession, on_delete=models.CASCADE)
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    chosen_answer = models.ForeignKey(Answer, on_delete=models.SET_NULL, null=True)
+    is_correct = models.BooleanField()
+    answered_at = models.DateTimeField(auto_now_add=True)
+```
+apps/daily/models.py
+```python
+class DailyChallenge(models.Model):
+    """Щоденне цікаве питання"""
+    question = models.ForeignKey('quiz.Question', on_delete=models.CASCADE)
+    date = models.DateField(unique=True)
+    fun_fact = models.TextField(blank=True)  # цікавий факт до питання
+
+    class Meta:
+        ordering = ['-date']
+
+class DailyChallengeResponse(models.Model):
+    challenge = models.ForeignKey(DailyChallenge, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             null=True, blank=True)
+    session_key = models.CharField(max_length=40, blank=True)
+    chosen_answer = models.ForeignKey('quiz.Answer', on_delete=models.SET_NULL, null=True)
+    is_correct = models.BooleanField()
+    answered_at = models.DateTimeField(auto_now_add=True)
+```
+apps/accounts/models.py
+```python
+class UserProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    push_notifications_enabled = models.BooleanField(default=False)
+    reminder_time = models.TimeField(default='19:00')  # час щоденного нагадування
+    streak_days = models.PositiveIntegerField(default=0)
+    last_activity_date = models.DateField(null=True, blank=True)
+    avatar_initial = models.CharField(max_length=2, blank=True)  # для UI аватара
+
+class UserNote(models.Model):
+    """Нотатки користувача до правил"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    rule = models.ForeignKey('rules.Rule', on_delete=models.CASCADE)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+class UserProgress(models.Model):
+    """Прогрес вивчення розділів"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    section = models.ForeignKey('rules.RuleSection', on_delete=models.CASCADE)
+    rules_read = models.ManyToManyField('rules.Rule', blank=True)
+    completed = models.BooleanField(default=False)
+    last_read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ['user', 'section']
+```
+apps/notifications/models.py
+```python
+class PushSubscription(models.Model):
+    """Web Push підписки"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    endpoint = models.TextField(unique=True)
+    p256dh = models.TextField()
+    auth = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+```
+---
+URL-структура
+```python
+# config/urls.py
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('apps.core.urls')),
+    path('rules/', include('apps.rules.urls')),
+    path('quiz/', include('apps.quiz.urls')),
+    path('daily/', include('apps.daily.urls')),
+    path('accounts/', include('apps.accounts.urls')),
+    path('notifications/', include('apps.notifications.urls')),
+    path('donate/', include('apps.donations.urls')),
+    path('sw.js', serve_service_worker),  # Service Worker на кореневому рівні
+]
+```
+Роути правил:
+`GET /rules/` — список розділів
+`GET /rules/<slug:section_slug>/` — правила розділу
+`GET /rules/<slug:section_slug>/<int:rule_number>/` — окреме правило
+Роути квізу:
+`GET /quiz/` — вибір категорії та режиму
+`POST /quiz/start/` — почати сесію (повертає JSON із першим питанням)
+`POST /quiz/answer/` — відповісти (AJAX/fetch, JSON)
+`GET /quiz/results/<uuid:session_id>/` — результати
+Роути daily:
+`GET /daily/` — поточне щоденне питання
+`POST /daily/answer/` — відповісти (AJAX)
+Роути accounts:
+`GET/POST /accounts/register/`
+`GET/POST /accounts/login/`
+`GET /accounts/logout/`
+`GET /accounts/profile/` — прогрес, нотатки, статистика
+`POST /accounts/notes/add/` — додати нотатку (AJAX)
+`POST /accounts/notifications/toggle/` — увімкнути/вимкнути нагадування
+Роути notifications:
+`POST /notifications/subscribe/` — зберегти Web Push підписку
+`POST /notifications/unsubscribe/` — видалити підписку
+---
+PWA-конфігурація
+/static/manifest.json
+```json
+{
+  "name": "UK Highway Code",
+  "short_name": "HighwayCode",
+  "description": "Learn and test UK road rules — official Highway Code",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#1a3a5c",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "categories": ["education", "lifestyle"],
+  "screenshots": [
+    { "src": "/static/screenshots/home.png", "sizes": "390x844", "type": "image/png" }
+  ]
+}
+```
+/static/sw.js (Service Worker)
+```javascript
+const CACHE_NAME = 'highway-code-v1';
+const OFFLINE_URL = '/offline/';
+const STATIC_ASSETS = [
+  '/', '/rules/', '/quiz/', '/daily/', '/offline/',
+  '/static/css/main.css', '/static/js/app.js',
+  '/static/icons/icon-192.png'
+];
+
+// Install — кешуємо статику
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
+  );
+  self.skipWaiting();
+});
+
+// Activate — видаляємо старі кеші
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+// Fetch — Network First для API, Cache First для статики
+self.addEventListener('fetch', event => {
+  if (event.request.url.includes('/api/') || event.request.url.includes('/quiz/answer/')) {
+    // Network only для динамічних запитів
+    return;
+  }
+  event.respondWith(
+    fetch(event.request)
+      .catch(() => caches.match(event.request) || caches.match(OFFLINE_URL))
+  );
+});
+
+// Push notifications
+self.addEventListener('push', event => {
+  const data = event.data?.json() || {};
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'UK Highway Code', {
+      body: data.body || "Time to practice your road rules! 🚗",
+      icon: '/static/icons/icon-192.png',
+      badge: '/static/icons/badge-72.png',
+      data: { url: data.url || '/daily/' },
+      actions: [
+        { action: 'open', title: 'Study now' },
+        { action: 'dismiss', title: 'Later' }
+      ]
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  if (event.action !== 'dismiss') {
+    event.waitUntil(clients.openWindow(event.notification.data.url));
+  }
+});
+```
+Реєстрація SW у base.html
+```html
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW error:', err));
+  });
+}
+</script>
+```
+---
+Web Push (нагадування)
+apps/notifications/views.py
+```python
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+from pywebpush import webpush, WebPushException
+import json
+
+@login_required
+def subscribe(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        PushSubscription.objects.update_or_create(
+            endpoint=data['endpoint'],
+            defaults={
+                'user': request.user,
+                'p256dh': data['keys']['p256dh'],
+                'auth': data['keys']['auth'],
+                'is_active': True,
+            }
+        )
+        return JsonResponse({'status': 'subscribed'})
+
+def send_push_notification(subscription, title, body, url='/daily/'):
+    try:
+        webpush(
+            subscription_info={
+                "endpoint": subscription.endpoint,
+                "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth}
+            },
+            data=json.dumps({"title": title, "body": body, "url": url}),
+            vapid_private_key=settings.VAPID_PRIVATE_KEY,
+            vapid_claims={"sub": f"mailto:{settings.VAPID_EMAIL}"}
+        )
+    except WebPushException as e:
+        if '410' in str(e):  # підписка більше не дійсна
+            subscription.update(is_active=False)
+```
+Celery task (щоденні нагадування)
+```python
+# apps/notifications/tasks.py
+from celery import shared_task
+from django.utils import timezone
+
+@shared_task
+def send_daily_reminders():
+    """Запускати щоденно — розсилає нагадування у потрібний час кожного юзера"""
+    now = timezone.localtime()
+    subscriptions = PushSubscription.objects.filter(
+        is_active=True,
+        user__userprofile__push_notifications_enabled=True,
+        user__userprofile__reminder_time__hour=now.hour,
+        user__userprofile__reminder_time__minute__range=(now.minute - 2, now.minute + 2)
+    ).select_related('user')
+
+    daily = DailyChallenge.objects.filter(date=now.date()).first()
+    for sub in subscriptions:
+        send_push_notification(
+            sub,
+            title="🚗 Daily Highway Code Challenge!",
+            body="A new question is waiting for you. Keep your streak going!",
+            url='/daily/'
+        )
+
+# celery beat schedule (config/celery.py)
+app.conf.beat_schedule = {
+    'send-daily-reminders': {
+        'task': 'apps.notifications.tasks.send_daily_reminders',
+        'schedule': 60.0,  # кожну хвилину перевіряє, кому пора надсилати
+    },
+}
+```
+---
+Перемикач мови (Google Translate)
+Використовувати Google Translate Widget — браузерний, без API-ключа, перекладає весь DOM.
+У base.html (перед `</body>`):
+```html
+<!-- Google Translate Widget -->
+<div id="google_translate_element" class="translate-widget"></div>
+<script type="text/javascript">
+  function googleTranslateElementInit() {
+    new google.translate.TranslateElement({
+      pageLanguage: 'en',
+      includedLanguages: 'uk,pl,ro,ar,zh-CN,hi,tr,fr,de,es,pt,ru',
+      layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+      autoDisplay: false
+    }, 'google_translate_element');
+  }
+</script>
+<script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+```
+CSS для вигляду перемикача:
+```css
+/* Вбудований в шапку/футер — легкий вигляд */
+.translate-widget { display: inline-block; }
+.goog-te-gadget { font-size: 0 !important; }
+.goog-te-gadget select {
+  font-size: 0.8rem;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: #fff;
+  color: #495057;
+  cursor: pointer;
+}
+```
+---
+Дизайн
+Концепція: Легкий, довірчий, офіційний але не нудний. Натхнення — UK road sign aesthetic (жовтий, темно-синій, білий). Чистий sans-serif.
+Палітра (CSS Variables):
+```css
+:root {
+  --color-primary: #1a3a5c;      /* темно-синій (UK road authority) */
+  --color-accent: #f5c518;       /* жовтий (road signs) */
+  --color-success: #2d7a4f;      /* зелений (correct answer) */
+  --color-danger: #c0392b;       /* червоний (wrong answer) */
+  --color-surface: #ffffff;
+  --color-bg: #f4f6f9;
+  --color-text: #1c1c2e;
+  --color-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --shadow-card: 0 2px 12px rgba(26,58,92,0.08);
+  --font-heading: 'DM Sans', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+```
+Компоненти:
+Картка правила: білий фон, легка тінь, номер правила — жовтий бейдж, кнопка "Add Note" праворуч
+Картка питання: великий шрифт, 4 варіанти у стовпчик (radio-style кнопки), анімація правильної/неправильної відповіді
+Прогрес-бар розділу: тонка лінія під заголовком розділу
+Daily Challenge: виділена картка з градієнтом, таймер до наступного питання
+Навігація: нижня панель (mobile-first): Home / Rules / Quiz / Daily / Profile
+Streak: відображати серію днів на Profile-сторінці (🔥 5 days)
+---
+Django Admin
+Налаштувати через `admin.py` у кожному app:
+```python
+# apps/rules/admin.py
+@admin.register(RuleSection)
+class RuleSectionAdmin(admin.ModelAdmin):
+    list_display = ['order', 'title', 'slug', 'source_url']
+    prepopulated_fields = {'slug': ('title',)}
+    ordering = ['order']
+
+@admin.register(Rule)
+class RuleAdmin(admin.ModelAdmin):
+    list_display = ['rule_number', 'title', 'section', 'updated_at']
+    list_filter = ['section']
+    search_fields = ['rule_number', 'title', 'content']
+
+# apps/quiz/admin.py
+class AnswerInline(admin.TabularInline):
+    model = Answer
+    extra = 4
+    min_num = 2
+
+@admin.register(Question)
+class QuestionAdmin(admin.ModelAdmin):
+    list_display = ['question_text_short', 'category', 'difficulty', 'is_active']
+    list_filter = ['category', 'difficulty', 'is_active']
+    search_fields = ['question_text']
+    inlines = [AnswerInline]
+
+    def question_text_short(self, obj):
+        return obj.question_text[:80]
+
+# apps/daily/admin.py
+@admin.register(DailyChallenge)
+class DailyChallengeAdmin(admin.ModelAdmin):
+    list_display = ['date', 'question', 'fun_fact']
+    date_hierarchy = 'date'
+```
+---
+Сторінка донату
+```python
+# apps/donations/views.py
+def donate(request):
+    """Статична сторінка з посиланнями на благодійні організації"""
+    charities = [
+        {
+            'name': 'British Red Cross',
+            'url': 'https://www.redcross.org.uk/donate',
+            'description': 'Humanitarian aid across the UK and worldwide',
+            'icon': '🏥'
+        },
+        {
+            'name': "Road Safety Trust",
+            'url': 'https://roadsafetytrust.org.uk/',
+            'description': 'Improving road safety through research and education',
+            'icon': '🛡️'
+        },
+        # Можна додати довільні org через адмінку — краще зробити модель Charity
+    ]
+    return render(request, 'donations/donate.html', {'charities': charities})
+```
+Або додати модель `Charity` і керувати через адмінку.
+---
+Налаштування (settings.py)
+```python
+# PWA / Push
+VAPID_PUBLIC_KEY = env('VAPID_PUBLIC_KEY')
+VAPID_PRIVATE_KEY = env('VAPID_PRIVATE_KEY')
+VAPID_EMAIL = env('VAPID_EMAIL', default='admin@example.com')
+
+# Static & Media
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = '/media/'
+
+# Manifest & SW
+PWA_MANIFEST_URL = '/static/manifest.json'
+
+# Celery
+CELERY_BROKER_URL = env('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Cache (для rate-limiting квізу тощо)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': env('REDIS_URL', default='redis://localhost:6379/1'),
+    }
+}
+
+# Security (production)
+SECURE_HSTS_SECONDS = 31536000
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+```
+---
+Анонімні користувачі
+Можуть переглядати всі правила (без нотаток)
+Можуть проходити тести (результати зберігаються в сесії Django)
+Можуть відповідати на Daily Challenge (1 раз на день за session_key)
+При спробі додати нотатку або увімкнути нагадування — soft-modal із пропозицією зареєструватись
+```python
+# Middleware для session_key анонімних
+class AnonymousSessionMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if not request.session.session_key:
+            request.session.create()
+        return self.get_response(request)
+```
+---
+Пакети (requirements.txt)
+```
+django>=5.0
+psycopg2-binary
+django-environ
+Pillow
+celery[redis]
+django-celery-beat
+pywebpush
+whitenoise
+gunicorn
+```
+---
+Джерела контенту (gov.uk)
+Контент рекомендується завантажити один раз через management command:
+```python
+# apps/rules/management/commands/import_highway_code.py
+# Парсинг із https://www.gov.uk/guidance/the-highway-code
+# використовуючи requests + BeautifulSoup
+# Зберігає RuleSection та Rule об'єкти в БД
+# Посилання на джерело зберігається у Rule.source_url
+```
+Офіційна ліцензія контенту: Open Government Licence v3.0 (OGL) — дозволяє вільне використання з обов'язковим зазначенням джерела gov.uk.
+---
+Деплой (мінімальний)
+```
+Railway / Render / DigitalOcean App Platform:
+- PostgreSQL (managed)
+- Redis (managed)
+- Gunicorn + WhiteNoise для статики
+- HTTPS обов'язковий для PWA та Web Push
+```
+---
+Чек-лист функціональності
+[ ] Перегляд усіх розділів ПДР з офіційним контентом
+[ ] Тестування (одиночні питання, міні-тест 10/20 питань, повний тест)
+[ ] Daily Challenge — нове питання щодня
+[ ] Реєстрація / вхід (email + password, або allauth для Google OAuth)
+[ ] Прогрес вивчення по розділах (для зареєстрованих)
+[ ] Нотатки до правил (для зареєстрованих)
+[ ] Web Push нагадування з вибором часу (для зареєстрованих)
+[ ] Перемикач мови (Google Translate Widget)
+[ ] Посилання на благодійний донат
+[ ] PWA (manifest + Service Worker + offline fallback)
+[ ] Django Admin для всього контенту
+[ ] Responsive, mobile-first дизайн
+[ ] HTTPS (обов'язково для PWA)

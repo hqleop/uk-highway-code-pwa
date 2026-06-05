@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Quiz Results | UK Highway Code{% endblock %}
+{% block content %}
+<section class="score-panel">
+  <p class="eyebrow">Quiz results</p>
+  <h1>{{ score }}%</h1>
+  <p>{{ quiz.correct_answers }} correct out of {{ quiz.total_questions }}</p>
+  <a class="button primary" href="{% url 'quiz:home' %}" data-icon="rotate-ccw">Practise again</a>
+</section>
+
+<div class="rule-list">
+  {% for response in responses %}
+    <div class="rule-card">
+      <span class="rule-number">{% if response.is_correct %}OK{% else %}Fix{% endif %}</span>
+      <div>
+        <strong>{{ response.question.question_text }}</strong>
+        <p>Your answer: {{ response.chosen_answer.text }}</p>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

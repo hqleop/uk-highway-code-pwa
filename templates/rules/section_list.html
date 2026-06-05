@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Rules | UK Highway Code{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Official Highway Code</p>
+    <h1>Rules by section</h1>
+  </div>
+  <form class="search-form" action="{% url 'rules:search' %}">
+    <input name="q" type="search" placeholder="Search rules" aria-label="Search rules">
+    <button class="icon-button" type="submit" title="Search"><i data-lucide="search"></i></button>
+  </form>
+</section>
+
+<div class="card-grid">
+  {% for section in sections %}
+    <a class="section-card" href="{% url 'rules:section_detail' section.slug %}">
+      <i data-lucide="{{ section.icon|default:'book-open' }}"></i>
+      <strong>{{ section.title }}</strong>
+      <span>{{ section.rule_total }} rules</span>
+    </a>
+  {% empty %}
+    <div class="empty-state">
+      <h2>No sections yet</h2>
+      <p>Import the official Highway Code from gov.uk with the management command.</p>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

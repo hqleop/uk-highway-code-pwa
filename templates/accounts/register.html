@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Register | UK Highway Code{% endblock %}
+{% block content %}
+<section class="auth-panel">
+  <h1>Create account</h1>
+  <form method="post" class="stack-form">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="button primary" type="submit" data-icon="user-plus">Register</button>
+  </form>
+</section>
+{% endblock %}

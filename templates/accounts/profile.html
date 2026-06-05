@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Profile | UK Highway Code{% endblock %}
+{% block content %}
+<section class="profile-head">
+  <div class="avatar">{{ profile.avatar_initial|default:"U" }}</div>
+  <div>
+    <p class="eyebrow">Learner profile</p>
+    <h1>{{ request.user.username }}</h1>
+    <p>{{ profile.streak_days }} day streak</p>
+  </div>
+</section>
+
+<section class="settings-panel">
+  <h2>Daily reminders</h2>
+  <form method="post" class="stack-form">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="button primary" type="submit" data-icon="save">Save preferences</button>
+  </form>
+  <button class="button ghost" type="button" data-enable-push data-icon="bell">Enable browser push</button>
+</section>
+
+<section class="section-band">
+  <div class="section-heading"><h2>Progress</h2></div>
+  <div class="rule-list">
+    {% for item in progress %}
+      <a class="rule-card" href="{% url 'rules:section_detail' item.section.slug %}">
+        <span class="rule-number">{% if item.completed %}OK{% else %}Read{% endif %}</span>
+        <div>
+          <strong>{{ item.section.title }}</strong>
+          <p>{{ item.rules_read.count }} rules read</p>
+        </div>
+      </a>
+    {% empty %}
+      <p class="muted">Read rules while logged in to build progress.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-heading"><h2>Recent notes</h2></div>
+  <div class="note-list">
+    {% for note in notes %}
+      <p><strong>{{ note.rule }}</strong><br>{{ note.content }}</p>
+    {% empty %}
+      <p class="muted">No notes yet.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

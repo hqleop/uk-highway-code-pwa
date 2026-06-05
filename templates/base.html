@@ -1,0 +1,82 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1a3a5c">
+  <title>{% block title %}UK Highway Code{% endblock %}</title>
+  <link rel="manifest" href="{{ PWA_MANIFEST_URL }}">
+  <link rel="icon" href="{% static 'icons/icon.svg' %}" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{% url 'core:home' %}" aria-label="UK Highway Code home">
+      <span class="brand-mark">HC</span>
+      <span>UK Highway Code</span>
+    </a>
+    <nav class="desktop-nav" aria-label="Main navigation">
+      <a href="{% url 'rules:section_list' %}">Rules</a>
+      <a href="{% url 'quiz:home' %}">Quiz</a>
+      <a href="{% url 'daily:today' %}">Daily</a>
+      <a href="{% url 'donations:donate' %}">Donate</a>
+      {% if request.user.is_authenticated %}
+        <a href="{% url 'accounts:profile' %}">Profile</a>
+      {% else %}
+        <a href="{% url 'accounts:login' %}">Login</a>
+      {% endif %}
+    </nav>
+    <div id="google_translate_element" class="translate-widget"></div>
+  </header>
+
+  {% if messages %}
+    <div class="messages" role="status">
+      {% for message in messages %}
+        <p class="message {{ message.tags }}">{{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <main class="page-shell">
+    {% block content %}{% endblock %}
+  </main>
+
+  <nav class="bottom-nav" aria-label="Mobile navigation">
+    <a href="{% url 'core:home' %}" title="Home" data-icon="home"><span>Home</span></a>
+    <a href="{% url 'rules:section_list' %}" title="Rules" data-icon="book-open"><span>Rules</span></a>
+    <a href="{% url 'quiz:home' %}" title="Quiz" data-icon="circle-help"><span>Quiz</span></a>
+    <a href="{% url 'daily:today' %}" title="Daily" data-icon="calendar-days"><span>Daily</span></a>
+    <a href="{% url 'accounts:profile' %}" title="Profile" data-icon="user-round"><span>Profile</span></a>
+  </nav>
+
+  <script>
+    window.HIGHWAY_CODE = {
+      vapidPublicKey: "{{ VAPID_PUBLIC_KEY|default:'' }}",
+      isAuthenticated: {{ request.user.is_authenticated|yesno:"true,false" }}
+    };
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(console.warn);
+      });
+    }
+    function googleTranslateElementInit() {
+      new google.translate.TranslateElement({
+        pageLanguage: "en",
+        includedLanguages: "uk,pl,ro,ar,zh-CN,hi,tr,fr,de,es,pt,ru",
+        layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+        autoDisplay: false
+      }, "google_translate_element");
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="{% static 'js/app.js' %}"></script>
+  <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

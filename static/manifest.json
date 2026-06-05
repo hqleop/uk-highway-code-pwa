@@ -1,0 +1,14 @@
+{
+  "name": "UK Highway Code",
+  "short_name": "HighwayCode",
+  "description": "Learn and test UK road rules with official gov.uk source links.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#1a3a5c",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/static/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "categories": ["education", "lifestyle"]
+}
