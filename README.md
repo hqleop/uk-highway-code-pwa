@@ -38,3 +38,13 @@ python manage.py import_highway_code
 ```
 
 The deploy runs `migrate` and `seed_quiz` automatically. The full official gov.uk content import is kept manual so regular deploys do not depend on the gov.uk scraper.
+
+If you create a Render Web Service manually instead of using Blueprint, set:
+
+```bash
+Build Command: bash ./build.sh
+Pre-Deploy Command: python manage.py migrate && python manage.py seed_quiz
+Start Command: gunicorn config.wsgi:application
+```
+
+If Render tries to run `gunicorn app:app`, the Start Command is still set to Render's default Flask-style command and must be changed.
