@@ -37,7 +37,7 @@ This repository includes `render.yaml`, so Render can create the web service and
 python manage.py import_highway_code
 ```
 
-The deploy runs `migrate` and `seed_quiz` automatically. The full official gov.uk content import is kept manual so regular deploys do not depend on the gov.uk scraper.
+The deploy runs `migrate`, `seed_quiz`, and imports Highway Code content if the rules table is empty. By default Render imports the first 8 official gov.uk sections via `IMPORT_HIGHWAY_CODE_LIMIT=8`.
 
 If you create a Render Web Service manually instead of using Blueprint, set:
 
@@ -50,3 +50,9 @@ Start Command: gunicorn config.wsgi:application
 If Render tries to run `gunicorn app:app`, the Start Command is still set to Render's default Flask-style command and must be changed.
 
 For a manually created Render service, add a PostgreSQL database and set the web service `DATABASE_URL` env var to its internal connection string. Without `DATABASE_URL`, Django falls back to SQLite, which is not persistent on Render.
+
+To import the full official Highway Code after deploy, open Render Shell and run:
+
+```bash
+python manage.py import_highway_code --flush
+```
