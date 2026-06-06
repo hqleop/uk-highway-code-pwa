@@ -7,13 +7,7 @@
     <h1>Donate</h1>
   </div>
 </section>
-<div class="card-grid">
-  {% for charity in charities %}
-    <a class="section-card" href="{{ charity.url }}" target="_blank" rel="noopener">
-      <i data-lucide="{% if charity.icon == 'shield' %}shield-check{% elif charity.icon == 'cross' %}cross{% else %}heart-handshake{% endif %}"></i>
-      <strong>{{ charity.name }}</strong>
-      <span>{{ charity.description }}</span>
-    </a>
-  {% endfor %}
-</div>
+<section class="empty-state">
+  <p>Donation options are currently unavailable.</p>
+</section>
 {% endblock %}
