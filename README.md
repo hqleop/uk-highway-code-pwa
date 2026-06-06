@@ -48,3 +48,5 @@ Start Command: gunicorn config.wsgi:application
 ```
 
 If Render tries to run `gunicorn app:app`, the Start Command is still set to Render's default Flask-style command and must be changed.
+
+For a manually created Render service, add a PostgreSQL database and set the web service `DATABASE_URL` env var to its internal connection string. Without `DATABASE_URL`, Django falls back to SQLite, which is not persistent on Render.
