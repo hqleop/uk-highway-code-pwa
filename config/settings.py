@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import environ
@@ -20,6 +21,18 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+
+RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
+
+if not DEBUG:
+    ALLOWED_HOSTS.extend([".onrender.com", "uk-highway-code-pwa.onrender.com"])
+    CSRF_TRUSTED_ORIGINS.extend(["https://*.onrender.com", "https://uk-highway-code-pwa.onrender.com"])
+
+ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
 
 INSTALLED_APPS = [
     "django.contrib.admin",
