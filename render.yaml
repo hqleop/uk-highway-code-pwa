@@ -36,4 +36,8 @@ services:
       - key: VAPID_EMAIL
         value: admin@example.com
       - key: IMPORT_HIGHWAY_CODE_LIMIT
-        value: "8"
+        value: ""
+      - key: MIN_HIGHWAY_CODE_SECTIONS
+        value: "20"
+      - key: LOAD_HIGHWAY_CODE_FIXTURES
+        value: "true"

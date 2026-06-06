@@ -32,7 +32,10 @@
         <a href="{% url 'accounts:login' %}">Login</a>
       {% endif %}
     </nav>
-    <div id="google_translate_element" class="translate-widget"></div>
+    <div class="language-control" title="Translate page">
+      <i data-lucide="languages"></i>
+      <div id="google_translate_element" class="translate-widget"></div>
+    </div>
   </header>
 
   {% if messages %}

@@ -37,7 +37,7 @@ This repository includes `render.yaml`, so Render can create the web service and
 python manage.py import_highway_code
 ```
 
-The deploy runs `migrate`, `seed_quiz`, and imports Highway Code content if the rules table is empty. By default Render imports the first 8 official gov.uk sections via `IMPORT_HIGHWAY_CODE_LIMIT=8`.
+The deploy runs `migrate`, `seed_quiz`, and loads bundled Highway Code fixtures if the rules table is not populated. The bundled data contains the full imported Highway Code plus generated rule-based quiz questions.
 
 If you create a Render Web Service manually instead of using Blueprint, set:
 

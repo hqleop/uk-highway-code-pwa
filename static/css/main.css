@@ -81,17 +81,42 @@ code {
   color: #32465b;
 }
 .desktop-nav a:hover { color: var(--color-primary); }
-.translate-widget { margin-left: auto; }
+.language-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  min-height: 38px;
+  max-width: 190px;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(26, 58, 92, 0.05);
+}
+.language-control svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-primary);
+  flex: none;
+}
+.translate-widget { min-width: 0; }
 .goog-te-gadget { font-size: 0 !important; }
 .goog-te-gadget select {
-  max-width: 145px;
+  width: 132px;
+  max-width: 132px;
   font-size: 0.8rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 4px 8px;
-  background: #fff;
-  color: #495057;
+  border: 0;
+  border-radius: 0;
+  padding: 4px 2px;
+  background: transparent;
+  color: #32465b;
   cursor: pointer;
+  font-weight: 700;
+}
+.goog-te-gadget span,
+.goog-te-gadget img {
+  display: none !important;
 }
 .page-shell {
   width: min(1120px, calc(100% - 2rem));
@@ -290,9 +315,36 @@ input, select, textarea {
   margin-top: 1rem;
   padding: 1rem;
 }
+.auth-panel {
+  width: min(100%, 760px);
+  margin-left: auto;
+  margin-right: auto;
+}
+.auth-panel-narrow {
+  width: min(100%, 420px);
+}
+.auth-panel h1 {
+  margin-bottom: 1rem;
+  font-size: 2rem;
+}
 .note-form, .stack-form, .quiz-setup {
   display: grid;
   gap: 0.9rem;
+}
+.stack-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 800;
+}
+.field-help {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.field-error {
+  color: var(--color-danger);
+  font-size: 0.84rem;
+  font-weight: 800;
 }
 .note-list { display: grid; gap: 0.65rem; margin-top: 1rem; }
 .note-list p {
@@ -398,13 +450,15 @@ input, select, textarea {
   body { padding-bottom: 0; }
   .desktop-nav { display: flex; }
   .bottom-nav { display: none; }
-  .translate-widget { margin-left: 0; }
+  .language-control { margin-left: 0; }
   .hero { grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr); }
   .quiz-setup { grid-template-columns: 1fr 1fr auto; align-items: end; }
 }
 
 @media (max-width: 520px) {
   .brand span:last-child { display: none; }
+  .language-control { max-width: 150px; }
+  .goog-te-gadget select { width: 96px; max-width: 96px; }
   .rule-card { grid-template-columns: 1fr; align-items: start; }
   .rule-detail-head { display: grid; }
   .daily-panel { align-items: flex-start; flex-direction: column; }

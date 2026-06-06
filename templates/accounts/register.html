@@ -1,11 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Register | UK Highway Code{% endblock %}
 {% block content %}
-<section class="auth-panel">
+<section class="auth-panel auth-panel-narrow">
   <h1>Create account</h1>
   <form method="post" class="stack-form">
     {% csrf_token %}
-    {{ form.as_p }}
+    {% for field in form %}
+      <label>
+        {{ field.label }}
+        {{ field }}
+        {% if field.help_text %}<span class="field-help">{{ field.help_text }}</span>{% endif %}
+        {% if field.errors %}<span class="field-error">{{ field.errors|striptags }}</span>{% endif %}
+      </label>
+    {% endfor %}
+    {% if form.non_field_errors %}<p class="field-error">{{ form.non_field_errors|striptags }}</p>{% endif %}
     <button class="button primary" type="submit" data-icon="user-plus">Register</button>
   </form>
 </section>
